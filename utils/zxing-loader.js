@@ -268,73 +268,13 @@ async function generateQR(text, options) {
 }
 
 // ---------------------------------------------------------------------------
-// 辅助：从 URL 获取图片 Blob（跨域可用）
-// ---------------------------------------------------------------------------
-
-/**
- * 从 URL 获取图片的 Blob（用于跨域图片扫描）
- * 仅在 Service Worker 中调用，因为 SW 的 fetch 不受 CORS 限制
- *
- * @param {string} url - 图片 URL
- * @param {string} [pageOrigin] - 嵌入图片的页面 origin（用于反盗链 Referer）
- *   若提供则用作 Referer，否则无 Referer 头
- * @returns {Promise<Blob>} 图片 Blob
- */
-async function fetchImageAsBlob(url, pageOrigin) {
-  // 请求头：模拟浏览器正常图片请求
-  // 关键：若已知嵌入页面的 origin，将其设为 Referer 绕过 CDN 反盗链
-  var headers = {
-    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-  };
-
-  // 有嵌入页 origin 时设为 Referer，CDN 反盗链通常校验这个值
-  if (pageOrigin) {
-    headers['Referer'] = pageOrigin + '/';
-  }
-
-  // 使用 credentials: 'include' 以传递可能存在的跨域 cookie（部分 CDN 需要）
-  var response = await fetch(url, {
-    headers: headers,
-    credentials: 'include'
-  });
-
-  // 如果第一次失败，无 Referer 重试一次
-  if (!response.ok) {
-    console.warn('[QR Helper] fetchImageAsBlob HTTP ' + response.status +
-      ', retrying without Referer...');
-    response = await fetch(url, {
-      headers: { 'Accept': 'image/*,*/*' },
-      credentials: 'include'
-    });
-  }
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch image: HTTP ' + response.status +
-      ' (after retry)');
-  }
-
-  var contentType = response.headers.get('content-type') || '';
-  var blob = await response.blob();
-
-  if (!contentType.startsWith('image/')) {
-    console.warn('[QR Helper] Fetched resource may not be an image:', contentType);
-  }
-
-  return blob;
-}
-
-// ---------------------------------------------------------------------------
 // 导出
 // ---------------------------------------------------------------------------
 
-// 统一导出 API，兼容 ES Module 风格和全局变量风格
-// 在 Content Script 中，此文件通过 manifest content_scripts -> js 数组注入
-// 在 Service Worker 中，此文件通过 importScripts 或 bundler 方式引入
-const QRModule = {
+var QRModule = {
   initQRModule: initQRModule,
   readQR: readQR,
   generateQR: generateQR,
-  fetchImageAsBlob: fetchImageAsBlob,
   getWasmUrl: getWasmUrl,
   isServiceWorker: isServiceWorker,
   isExtensionPage: isExtensionPage

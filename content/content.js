@@ -340,8 +340,7 @@ function scanCrossOriginImage(imageUrl, mouseX, mouseY) {
 
   chrome.runtime.sendMessage({
     action: 'fetchAndScanImage',
-    imageUrl: imageUrl,
-    pageOrigin: window.location.origin  // 传递当前页面 origin 给 SW 用作 Referer
+    imageUrl: imageUrl
   }, function (response) {
     if (timedOut) return; // 超时已处理，忽略
 

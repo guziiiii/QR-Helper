@@ -1,11 +1,12 @@
 /**
- * Background Service Worker
+ * Background Service Worker v1.1.0
  *
  * 功能：
  * - 创建树状右键菜单（QR Helper 父菜单 + 子菜单项）
  * - 处理右键菜单点击事件（选中文本/页面 URL/链接/图片扫描）
  * - 调用 WASM 模块生成或扫描 QR 码
- * - 跨域图片获取代理（SW fetch 无 CORS 限制）
+ * - 跨域图片获取代理：使用 chrome.debugger CDP Network.loadNetworkResource
+ *   以浏览器完整网络栈加载图片（Sec-Fetch-Dest: image），绕过 CDN 反盗链
  * - 与 Content Script 通信，传递扫描/生成结果
  * - 读取设置（URL 自动打开等）
  *
@@ -14,7 +15,6 @@
  *   2. utils/zxing-loader.js   → QRModule 包装函数
  */
 
-// 在 Service Worker 中加载 ZXing-WASM 和加载器
 importScripts('../lib/zxing-wasm-full.js');
 importScripts('../utils/zxing-loader.js');
 
@@ -22,7 +22,6 @@ importScripts('../utils/zxing-loader.js');
 // 常量
 // ---------------------------------------------------------------------------
 
-/** 右键菜单 ID 常量 */
 var MENU_IDS = {
   PARENT: 'qr-helper-parent',
   GENERATE_SELECTION: 'qr-generate-selection',
@@ -31,7 +30,6 @@ var MENU_IDS = {
   SCAN_IMAGE: 'qr-scan-image'
 };
 
-/** 扫描超时（毫秒） */
 var SCAN_TIMEOUT = 15000;
 
 // ---------------------------------------------------------------------------
@@ -49,7 +47,6 @@ var settingsInitPromise = null;
 
 function loadSettings() {
   if (settingsInitPromise) return settingsInitPromise;
-
   settingsInitPromise = chrome.storage.sync.get(null).then(function (items) {
     if (items.autoOpenUrl !== undefined) settingsCache.autoOpenUrl = items.autoOpenUrl;
     if (items.openInNewTab !== undefined) settingsCache.openInNewTab = items.openInNewTab;
@@ -57,7 +54,6 @@ function loadSettings() {
     if (items.qrEcLevel !== undefined) settingsCache.qrEcLevel = items.qrEcLevel;
     return settingsCache;
   });
-
   return settingsInitPromise;
 }
 
@@ -67,36 +63,69 @@ function loadSettings() {
 
 function createContextMenus() {
   chrome.contextMenus.removeAll(function () {
-    chrome.contextMenus.create({
-      id: MENU_IDS.PARENT,
-      title: chrome.i18n.getMessage('contextMenu_parent'),
-      contexts: ['all']
-    });
-    chrome.contextMenus.create({
-      id: MENU_IDS.GENERATE_SELECTION,
-      parentId: MENU_IDS.PARENT,
-      title: chrome.i18n.getMessage('contextMenu_generateSelection'),
-      contexts: ['selection']
-    });
-    chrome.contextMenus.create({
-      id: MENU_IDS.GENERATE_PAGE,
-      parentId: MENU_IDS.PARENT,
-      title: chrome.i18n.getMessage('contextMenu_generatePage'),
-      contexts: ['page']
-    });
-    chrome.contextMenus.create({
-      id: MENU_IDS.GENERATE_LINK,
-      parentId: MENU_IDS.PARENT,
-      title: chrome.i18n.getMessage('contextMenu_generateLink'),
-      contexts: ['link']
-    });
-    chrome.contextMenus.create({
-      id: MENU_IDS.SCAN_IMAGE,
-      parentId: MENU_IDS.PARENT,
-      title: chrome.i18n.getMessage('contextMenu_scanImage'),
-      contexts: ['image']
-    });
+    chrome.contextMenus.create({ id: MENU_IDS.PARENT, title: chrome.i18n.getMessage('contextMenu_parent'), contexts: ['all'] });
+    chrome.contextMenus.create({ id: MENU_IDS.GENERATE_SELECTION, parentId: MENU_IDS.PARENT, title: chrome.i18n.getMessage('contextMenu_generateSelection'), contexts: ['selection'] });
+    chrome.contextMenus.create({ id: MENU_IDS.GENERATE_PAGE, parentId: MENU_IDS.PARENT, title: chrome.i18n.getMessage('contextMenu_generatePage'), contexts: ['page'] });
+    chrome.contextMenus.create({ id: MENU_IDS.GENERATE_LINK, parentId: MENU_IDS.PARENT, title: chrome.i18n.getMessage('contextMenu_generateLink'), contexts: ['link'] });
+    chrome.contextMenus.create({ id: MENU_IDS.SCAN_IMAGE, parentId: MENU_IDS.PARENT, title: chrome.i18n.getMessage('contextMenu_scanImage'), contexts: ['image'] });
   });
+}
+
+// ---------------------------------------------------------------------------
+// CDP 图片获取 — 使用 chrome.debugger 的 Network.loadNetworkResource
+// 通过浏览器完整网络栈请求图片，天然附带 Sec-Fetch-Dest: image
+// ---------------------------------------------------------------------------
+
+/**
+ * 通过 CDP 从指定 tab 加载图片资源
+ * 以该 tab 的浏览器上下文发出请求（带正确 cookies、headers、Sec-Fetch-* 头）
+ *
+ * @param {string} imageUrl - 图片 URL
+ * @param {number} tabId - 标签页 ID
+ * @returns {Promise<Uint8Array>} 图片的原始字节
+ */
+async function fetchImageViaCDP(imageUrl, tabId) {
+  // attach debugger 到目标 tab
+  await chrome.debugger.attach({ tabId: tabId }, '1.3');
+
+  var result;
+  try {
+    result = await chrome.debugger.sendCommand(
+      { tabId: tabId },
+      'Network.loadNetworkResource',
+      {
+        url: imageUrl,
+        options: {
+          disableCache: false,
+          includeCredentials: true
+        }
+      }
+    );
+  } finally {
+    // 无论成功失败，立即 detach（debugger 横幅仅瞬间出现）
+    await chrome.debugger.detach({ tabId: tabId });
+  }
+
+  if (!result || !result.resource || !result.resource.success) {
+    var errMsg = (result && result.resource && result.resource.netErrorCode)
+      ? 'Network error: ' + result.resource.netErrorCode
+      : 'CDP load failed';
+    throw new Error(errMsg);
+  }
+
+  if (!result.resource.base64Encoded) {
+    throw new Error('CDP returned non-base64 content');
+  }
+
+  // base64 → Uint8Array
+  var base64 = result.resource.base64Encoded;
+  var binary = atob(base64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,30 +133,29 @@ function createContextMenus() {
 // ---------------------------------------------------------------------------
 
 /**
- * 从图片 URL 扫描 QR 码（带超时）
+ * 从图片 URL 扫描 QR 码
+ * 使用 CDP 获取图片字节，避免 CDN 反盗链拦截
  *
  * @param {string} imageUrl - 图片 URL
- * @param {string} [pageOrigin] - 嵌入图片的页面 origin（用于 Referer 反盗链）
+ * @param {number} tabId - 标签页 ID（用于 CDP attach）
  */
-async function scanImageFromUrl(imageUrl, pageOrigin) {
-  // 确保 WASM 模块已初始化
+async function scanImageFromUrl(imageUrl, tabId) {
   await QRModule.initQRModule();
 
-  // 创建一个超时 Promise
   var timeoutPromise = new Promise(function (_, reject) {
     setTimeout(function () {
       reject(new Error('Scan timed out after ' + (SCAN_TIMEOUT / 1000) + 's'));
     }, SCAN_TIMEOUT);
   });
 
-  // 实际扫描 Promise
   var scanPromise = (async function () {
-    var blob = await QRModule.fetchImageAsBlob(imageUrl, pageOrigin);
-    var result = await QRModule.readQR(blob);
+    // 使用 CDP 获取图片原始字节
+    var imageBytes = await fetchImageViaCDP(imageUrl, tabId);
+    // 传给 ZXing-WASM 扫描（接受 Uint8Array 格式的图片）
+    var result = await QRModule.readQR(imageBytes);
     return result;
   })();
 
-  // 谁先返回就用谁
   return await Promise.race([scanPromise, timeoutPromise]);
 }
 
@@ -137,11 +165,10 @@ async function scanImageFromUrl(imageUrl, pageOrigin) {
 
 async function generateQRCode(text) {
   await loadSettings();
-  var options = {
+  return await QRModule.generateQR(text, {
     scale: settingsCache.qrScale || 8,
     ecLevel: settingsCache.qrEcLevel || 'M'
-  };
-  return await QRModule.generateQR(text, options);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,9 +179,7 @@ function detectURL(text) {
   if (!text) return null;
   var urlPattern = /^(https?:\/\/)?([\w\-]+\.)+[\w\-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=]*)?$/i;
   if (urlPattern.test(text.trim())) {
-    if (!text.match(/^https?:\/\//i)) {
-      return 'https://' + text.trim();
-    }
+    if (!text.match(/^https?:\/\//i)) return 'https://' + text.trim();
     return text.trim();
   }
   return null;
@@ -164,26 +189,29 @@ function handleAutoOpenURL(url, tabId) {
   if (!url) return;
   loadSettings().then(function () {
     if (!settingsCache.autoOpenUrl) return;
-    if (settingsCache.openInNewTab) {
-      chrome.tabs.create({ url: url, active: true });
-    } else {
-      chrome.tabs.update(tabId, { url: url });
-    }
+    if (settingsCache.openInNewTab) chrome.tabs.create({ url: url, active: true });
+    else chrome.tabs.update(tabId, { url: url });
   });
 }
 
 // ---------------------------------------------------------------------------
-// 事件处理：右键菜单点击（async 防止 SW 提前终止）
+// 安全发送消息到 Content Script
+// ---------------------------------------------------------------------------
+
+function sendToContentScriptSafe(tabId, message) {
+  return chrome.tabs.sendMessage(tabId, message).catch(function () {});
+}
+
+// ---------------------------------------------------------------------------
+// 事件处理：右键菜单点击
 // ---------------------------------------------------------------------------
 
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
   loadSettings();
 
-  // 使用立即执行的 async 函数确保 Promise 链被 SW 跟踪
   (async function () {
     switch (info.menuItemId) {
 
-      // 生成 QR：选中文本
       case MENU_IDS.GENERATE_SELECTION:
         if (!info.selectionText) return;
         try {
@@ -200,7 +228,6 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         }
         break;
 
-      // 生成 QR：页面 URL
       case MENU_IDS.GENERATE_PAGE:
         if (!info.pageUrl) return;
         try {
@@ -217,7 +244,6 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         }
         break;
 
-      // 生成 QR：链接 URL
       case MENU_IDS.GENERATE_LINK:
         if (!info.linkUrl) return;
         try {
@@ -234,46 +260,30 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         }
         break;
 
-      // 扫描 QR：从图片
+      // 扫描 QR：从图片（使用 tab.id 挂载 CDP）
       case MENU_IDS.SCAN_IMAGE:
         if (!info.srcUrl) return;
-
-        // 先通知 Content Script 显示"扫描中"
         await sendToContentScriptSafe(tab.id, {
           action: 'showProgress',
           message: chrome.i18n.getMessage('toast_scanning')
         });
-
         try {
-          // 从 tab.url 提取嵌入页面的 origin 作为 Referer（绕过 CDN 反盗链）
-          var pageOrigin = '';
-          if (tab && tab.url) {
-            try { pageOrigin = new URL(tab.url).origin; } catch (_) {}
-          }
-          var result = await scanImageFromUrl(info.srcUrl, pageOrigin);
+          var result = await scanImageFromUrl(info.srcUrl, tab.id);
 
           if (result && result.text) {
-            // 扫描成功
             await sendToContentScriptSafe(tab.id, {
               action: 'scanResult',
               data: { text: result.text, format: result.format }
             });
-
-            // 复制到剪贴板
             try {
               await sendToContentScriptSafe(tab.id, {
                 action: 'copyToClipboard',
                 text: result.text
               });
-            } catch (_) { /* 复制失败不中断流程 */ }
-
-            // 自动打开 URL
+            } catch (_) {}
             var detectedUrl = detectURL(result.text);
-            if (detectedUrl) {
-              handleAutoOpenURL(detectedUrl, tab.id);
-            }
+            if (detectedUrl) handleAutoOpenURL(detectedUrl, tab.id);
           } else {
-            // 未找到 QR 码
             await sendToContentScriptSafe(tab.id, {
               action: 'scanFailed',
               message: chrome.i18n.getMessage('toast_scanFailed')
@@ -292,28 +302,22 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
 });
 
 // ---------------------------------------------------------------------------
-// 安全发送消息到 Content Script（失败不抛异常）
-// ---------------------------------------------------------------------------
-
-function sendToContentScriptSafe(tabId, message) {
-  return chrome.tabs.sendMessage(tabId, message).catch(function () {
-    // Content Script 可能尚未注入，静默忽略
-  });
-}
-
-// ---------------------------------------------------------------------------
-// 消息监听（来自 Content Script 的请求）
+// 消息监听（来自 Content Script）
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   switch (message.action) {
 
     // Content Script 请求：扫描跨域图片
+    // sender.tab.id 来自发起消息的标签页
     case 'fetchAndScanImage':
       (function () {
-        var imgUrl = message.imageUrl;
-        var refOrigin = message.pageOrigin || '';
-        scanImageFromUrl(imgUrl, refOrigin)
+        var tabId = message.tabId || (sender && sender.tab && sender.tab.id);
+        if (!tabId) {
+          sendResponse({ success: false, error: 'No tabId available' });
+          return;
+        }
+        scanImageFromUrl(message.imageUrl, tabId)
           .then(function (result) {
             sendResponse({ success: true, result: result });
           })
@@ -321,14 +325,13 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             sendResponse({ success: false, error: err.message });
           });
       })();
-      return true; // async
+      return true;
 
-    // Content Script 请求：获取设置
     case 'getSettings':
       loadSettings().then(function () {
         sendResponse(settingsCache);
       });
-      return true; // async
+      return true;
 
     default:
       sendResponse({ success: false, error: 'Unknown action: ' + message.action });
@@ -355,17 +358,16 @@ chrome.storage.onChanged.addListener(function (changes, areaName) {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onInstalled.addListener(function (details) {
-  console.log('[QR Helper] Extension installed/updated:', details.reason);
+  console.log('[QR Helper v1.1.0] Installed:', details.reason);
   createContextMenus();
   loadSettings();
   QRModule.initQRModule().then(function () {
-    console.log('[QR Helper] WASM module ready in service worker');
+    console.log('[QR Helper] WASM module ready');
   }).catch(function (err) {
-    console.error('[QR Helper] WASM initialization failed:', err);
+    console.error('[QR Helper] WASM init failed:', err);
   });
 });
 
-// 启动时初始化
 loadSettings();
 QRModule.initQRModule().catch(function (err) {
   console.warn('[QR Helper] Initial WASM init:', err.message);
