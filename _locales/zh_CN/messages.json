@@ -1,0 +1,122 @@
+{
+  "appName": {
+    "message": "QR 助手",
+    "description": "扩展名称，显示在 Chrome 网上应用店和 chrome://extensions"
+  },
+  "appDescription": {
+    "message": "在任何网页中扫描和生成二维码。长按图片解码，右键菜单生成二维码。",
+    "description": "Chrome 网上应用店的简短描述"
+  },
+
+  "contextMenu_parent": {
+    "message": "QR 助手",
+    "description": "右键菜单父项标题"
+  },
+  "contextMenu_generateSelection": {
+    "message": "从 \"%s\" 生成二维码",
+    "description": "右键菜单：从选中文本生成二维码。%s 会被 Chrome 替换为选中的文本。"
+  },
+  "contextMenu_generatePage": {
+    "message": "生成当前页面链接二维码",
+    "description": "右键菜单：从当前页面 URL 生成二维码"
+  },
+  "contextMenu_generateLink": {
+    "message": "生成链接二维码",
+    "description": "右键菜单：从链接 URL 生成二维码"
+  },
+  "contextMenu_scanImage": {
+    "message": "扫描此图片中的二维码",
+    "description": "右键菜单：从图片中扫描/解码二维码"
+  },
+
+  "toast_scanning": {
+    "message": "正在扫描二维码...",
+    "description": "扫描图片二维码时显示"
+  },
+  "toast_scanSuccess": {
+    "message": "检测到二维码：$content$",
+    "description": "二维码扫描成功时显示。$content$ 是解码后的文本。",
+    "placeholders": {
+      "content": {
+        "content": "$1",
+        "example": "https://example.com"
+      }
+    }
+  },
+  "toast_scanFailed": {
+    "message": "此图片中未找到二维码",
+    "description": "扫描失败，未检测到二维码时显示"
+  },
+  "toast_scanError": {
+    "message": "图片扫描失败：$reason$",
+    "description": "扫描遇到错误时显示。$reason$ 是错误详情。",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "网络错误"
+      }
+    }
+  },
+  "toast_copySuccess": {
+    "message": "已复制到剪贴板：$content$",
+    "description": "内容复制到剪贴板时显示。$content$ 是复制的内容。",
+    "placeholders": {
+      "content": {
+        "content": "$1",
+        "example": "https://example.com"
+      }
+    }
+  },
+  "toast_copyFailed": {
+    "message": "复制到剪贴板失败",
+    "description": "剪贴板写入失败时显示"
+  },
+  "toast_isURL": {
+    "message": "正在打开链接...",
+    "description": "检测到二维码内容是链接并正在打开时显示"
+  },
+  "toast_generateSuccess": {
+    "message": "二维码已生成",
+    "description": "二维码生成成功时显示"
+  },
+  "toast_generateFailed": {
+    "message": "二维码生成失败：$reason$",
+    "description": "二维码生成失败时显示。$reason$ 是错误详情。",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "输入文本过长"
+      }
+    }
+  },
+
+  "options_title": {
+    "message": "QR 助手设置",
+    "description": "设置页面标题"
+  },
+  "options_autoOpenUrl": {
+    "message": "二维码内容为链接时自动打开",
+    "description": "复选框标签：检测到二维码内容为 URL 时自动打开"
+  },
+  "options_openInNewTab": {
+    "message": "在新标签页中打开",
+    "description": "单选选项：在新建标签页中打开检测到的 URL"
+  },
+  "options_openInCurrentTab": {
+    "message": "在当前标签页中打开",
+    "description": "单选选项：在当前标签页中打开检测到的 URL"
+  },
+  "options_saveButton": {
+    "message": "保存设置",
+    "description": "保存设置按钮的标签"
+  },
+  "options_saveSuccess": {
+    "message": "设置已保存",
+    "description": "保存设置后显示"
+  },
+
+  "popup_enableLongPress": {
+    "message": "启用长按扫描图片二维码",
+    "description": "复选框：启用长按图片扫描二维码"
+  }
+}

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <style>
+    /* -------------------------------------------------------------------
+       全局
+       ------------------------------------------------------------------- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      color: #333333;
+      background: #ffffff;
+      padding: 24px;
+      min-width: 400px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1976D2;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1976D2;
+    }
+
+    /* -------------------------------------------------------------------
+       设置区块
+       ------------------------------------------------------------------- */
+    .setting-group {
+      margin-bottom: 24px;
+    }
+
+    .setting-group h2 {
+      font-size: 15px;
+      font-weight: 500;
+      color: #555555;
+      margin-bottom: 12px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .setting-item:last-child {
+      border-bottom: none;
+    }
+
+    /* 复选框与单选按钮 */
+    .setting-item input[type="checkbox"],
+    .setting-item input[type="radio"] {
+      margin-right: 10px;
+      margin-top: 3px;
+      flex-shrink: 0;
+    }
+
+    .setting-item label {
+      cursor: pointer;
+      user-select: none;
+      line-height: 1.5;
+    }
+
+    /* 子选项缩进 */
+    .sub-options {
+      margin-left: 26px;
+    }
+
+    .sub-options .setting-item {
+      padding: 6px 0;
+      border-bottom: none;
+    }
+
+    /* -------------------------------------------------------------------
+       保存按钮
+       ------------------------------------------------------------------- */
+    .save-section {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .save-button {
+      background: #1976D2;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .save-button:hover {
+      background: #1565C0;
+    }
+
+    .save-button:active {
+      background: #0D47A1;
+    }
+
+    .save-status {
+      font-size: 13px;
+      color: #388E3C;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .save-status.visible {
+      opacity: 1;
+    }
+
+    /* -------------------------------------------------------------------
+       页脚
+       ------------------------------------------------------------------- */
+    .footer {
+      margin-top: 32px;
+      font-size: 12px;
+      color: #999999;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- 标题（通过 JS 注入 I18N） -->
+  <h1 id="page-title"></h1>
+
+  <!-- 长按扫描开关 -->
+  <div class="setting-group">
+    <div class="setting-item">
+      <input type="checkbox" id="enable-long-press" />
+      <label for="enable-long-press" id="label-enable-long-press"></label>
+    </div>
+  </div>
+
+  <!-- 自动打开 URL -->
+  <div class="setting-group">
+    <h2 id="label-auto-open"></h2>
+    <div class="setting-item">
+      <input type="checkbox" id="auto-open-url" />
+      <label for="auto-open-url" id="label-auto-open-url"></label>
+    </div>
+
+    <!-- 打开方式的子选项 -->
+    <div class="sub-options" id="open-method-section">
+      <div class="setting-item">
+        <input type="radio" name="open-method" id="open-new-tab" value="new-tab" />
+        <label for="open-new-tab" id="label-open-new-tab"></label>
+      </div>
+      <div class="setting-item">
+        <input type="radio" name="open-method" id="open-current-tab" value="current-tab" />
+        <label for="open-current-tab" id="label-open-current-tab"></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 保存区域 -->
+  <div class="save-section">
+    <button class="save-button" id="save-button"></button>
+    <span class="save-status" id="save-status"></span>
+  </div>
+
+  <div class="footer">
+    QR Helper v1.0.0
+  </div>
+
+  <!-- 脚本 -->
+  <script src="options.js"></script>
+</body>
+</html>

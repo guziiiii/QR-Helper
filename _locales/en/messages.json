@@ -1,0 +1,122 @@
+{
+  "appName": {
+    "message": "QR Helper",
+    "description": "Extension name shown in Chrome Web Store and chrome://extensions"
+  },
+  "appDescription": {
+    "message": "Scan and generate QR codes from any page. Long-press images to decode, right-click to generate.",
+    "description": "Short description for Chrome Web Store"
+  },
+
+  "contextMenu_parent": {
+    "message": "QR Helper",
+    "description": "Parent context menu item title"
+  },
+  "contextMenu_generateSelection": {
+    "message": "Generate QR from \"%s\"",
+    "description": "Context menu: generate QR from selected text. %s is replaced by Chrome with selected text."
+  },
+  "contextMenu_generatePage": {
+    "message": "Generate QR from page URL",
+    "description": "Context menu: generate QR from current page URL"
+  },
+  "contextMenu_generateLink": {
+    "message": "Generate QR from link URL",
+    "description": "Context menu: generate QR from a link's URL"
+  },
+  "contextMenu_scanImage": {
+    "message": "Scan QR code from this image",
+    "description": "Context menu: scan/decode a QR code from an image"
+  },
+
+  "toast_scanning": {
+    "message": "Scanning QR code...",
+    "description": "Shown while scanning an image for QR codes"
+  },
+  "toast_scanSuccess": {
+    "message": "QR code detected: $content$",
+    "description": "Shown when QR code scan succeeds. $content$ is the decoded text.",
+    "placeholders": {
+      "content": {
+        "content": "$1",
+        "example": "https://example.com"
+      }
+    }
+  },
+  "toast_scanFailed": {
+    "message": "No QR code found in this image",
+    "description": "Shown when scanning fails to detect a QR code"
+  },
+  "toast_scanError": {
+    "message": "Failed to scan image: $reason$",
+    "description": "Shown when scanning encounters an error. $reason$ is the error detail.",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "Network error"
+      }
+    }
+  },
+  "toast_copySuccess": {
+    "message": "Copied to clipboard: $content$",
+    "description": "Shown when content is copied to clipboard. $content$ is what was copied.",
+    "placeholders": {
+      "content": {
+        "content": "$1",
+        "example": "https://example.com"
+      }
+    }
+  },
+  "toast_copyFailed": {
+    "message": "Failed to copy to clipboard",
+    "description": "Shown when clipboard write fails"
+  },
+  "toast_isURL": {
+    "message": "Opening link...",
+    "description": "Shown when detected QR content is a URL and is being opened"
+  },
+  "toast_generateSuccess": {
+    "message": "QR code generated",
+    "description": "Shown when QR code generation succeeds"
+  },
+  "toast_generateFailed": {
+    "message": "Failed to generate QR code: $reason$",
+    "description": "Shown when QR generation fails. $reason$ is the error detail.",
+    "placeholders": {
+      "reason": {
+        "content": "$1",
+        "example": "Input text too long"
+      }
+    }
+  },
+
+  "options_title": {
+    "message": "QR Helper Settings",
+    "description": "Options page title"
+  },
+  "options_autoOpenUrl": {
+    "message": "Auto-open when QR content is a URL",
+    "description": "Checkbox label: automatically open URLs found in QR codes"
+  },
+  "options_openInNewTab": {
+    "message": "Open URL in a new tab",
+    "description": "Radio/checkbox option: open detected URL in a new tab"
+  },
+  "options_openInCurrentTab": {
+    "message": "Open URL in current tab",
+    "description": "Radio/checkbox option: open detected URL in the current tab"
+  },
+  "options_saveButton": {
+    "message": "Save Settings",
+    "description": "Button label to save settings"
+  },
+  "options_saveSuccess": {
+    "message": "Settings saved successfully",
+    "description": "Shown after saving settings"
+  },
+
+  "popup_enableLongPress": {
+    "message": "Enable long-press to scan QR codes",
+    "description": "Checkbox: enable long-press on images to scan QR codes"
+  }
+}
