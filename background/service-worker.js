@@ -93,13 +93,7 @@ async function fetchImageViaCDP(imageUrl, tabId) {
     result = await chrome.debugger.sendCommand(
       { tabId: tabId },
       'Network.loadNetworkResource',
-      {
-        url: imageUrl,
-        options: {
-          disableCache: false,
-          includeCredentials: true
-        }
-      }
+      { url: imageUrl }
     );
   } finally {
     // 无论成功失败，立即 detach（debugger 横幅仅瞬间出现）
