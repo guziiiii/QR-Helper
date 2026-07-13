@@ -88,38 +88,71 @@ async function fetchImageViaCDP(imageUrl, tabId) {
   // attach debugger 到目标 tab
   await chrome.debugger.attach({ tabId: tabId }, '1.3');
 
+  // 加载图片资源（返回 IO.StreamHandle）
   var result;
   try {
     result = await chrome.debugger.sendCommand(
       { tabId: tabId },
       'Network.loadNetworkResource',
-      { url: imageUrl }
+      {
+        url: imageUrl,
+        options: {
+          disableCache: false,
+          includeCredentials: true
+        }
+      }
     );
-  } finally {
-    // 无论成功失败，立即 detach（debugger 横幅仅瞬间出现）
+  } catch (err) {
     await chrome.debugger.detach({ tabId: tabId });
+    throw err;
   }
 
   if (!result || !result.resource || !result.resource.success) {
-    var errMsg = (result && result.resource && result.resource.netErrorCode)
-      ? 'Network error: ' + result.resource.netErrorCode
+    await chrome.debugger.detach({ tabId: tabId });
+    var errMsg = (result && result.resource && result.resource.netError)
+      ? 'Network error: ' + result.resource.netError
       : 'CDP load failed';
     throw new Error(errMsg);
   }
 
-  if (!result.resource.base64Encoded) {
-    throw new Error('CDP returned non-base64 content');
+  // 通过 IO 域读取 stream 内容
+  var streamHandle = result.resource.stream;
+  if (!streamHandle) {
+    await chrome.debugger.detach({ tabId: tabId });
+    throw new Error('CDP returned no stream handle');
   }
 
-  // base64 → Uint8Array
-  var base64 = result.resource.base64Encoded;
-  var binary = atob(base64);
-  var bytes = new Uint8Array(binary.length);
-  for (var i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  var chunks = [];
+  var isBase64 = false;
+  try {
+    while (true) {
+      var readResult = await chrome.debugger.sendCommand(
+        { tabId: tabId },
+        'IO.read',
+        { handle: streamHandle }
+      );
+      if (readResult.data) {
+        chunks.push(readResult.data);
+        if (readResult.base64Encoded) isBase64 = true;
+      }
+      if (readResult.eof) break;
+    }
+  } finally {
+    try { await chrome.debugger.sendCommand({ tabId: tabId }, 'IO.close', { handle: streamHandle }); } catch (_) {}
+    await chrome.debugger.detach({ tabId: tabId });
   }
 
-  return bytes;
+  var raw;
+  if (isBase64) {
+    var base64 = chunks.join('');
+    var binary = atob(base64);
+    raw = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) raw[i] = binary.charCodeAt(i);
+  } else {
+    raw = new TextEncoder().encode(chunks.join(''));
+  }
+
+  return raw;
 }
 
 // ---------------------------------------------------------------------------
