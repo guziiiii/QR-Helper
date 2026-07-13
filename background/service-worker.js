@@ -251,6 +251,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       return true;
 
     default:
+      sendResponse({ success: false, error: 'Unknown action: ' + message.action });
       break;
   }
 });
