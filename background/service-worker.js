@@ -82,14 +82,20 @@ function createContextMenus() {
 async function scanImageFromUrl(imageUrl) {
   await QRModule.initQRModule();
 
-  // 获取图片原始字节（Uint8Array）
-  var response = await fetch(imageUrl, { credentials: 'include' });
-  if (!response.ok) throw new Error('Failed to fetch image: HTTP ' + response.status);
-  var buffer = await response.arrayBuffer();
-  var bytes = new Uint8Array(buffer);
+  var timeoutPromise = new Promise(function (_, reject) {
+    setTimeout(function () {
+      reject(new Error('Scan timed out after ' + (SCAN_TIMEOUT / 1000) + 's'));
+    }, SCAN_TIMEOUT);
+  });
 
-  // 传给 ZXing-WASM 扫描
-  return await QRModule.readQR(bytes);
+  var scanPromise = (async function () {
+    var response = await fetch(imageUrl, { credentials: 'include' });
+    if (!response.ok) throw new Error('Failed to fetch image: HTTP ' + response.status);
+    var buffer = await response.arrayBuffer();
+    return await QRModule.readQR(new Uint8Array(buffer));
+  })();
+
+  return await Promise.race([scanPromise, timeoutPromise]);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +162,7 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         } catch (err) {
           await sendToContentScriptSafe(tab.id, {
             action: 'showError',
-            error: chrome.i18n.getMessage('toast_generateFailed', err.message)
+            error: chrome.i18n.getMessage('toast_generateFailed', err.message || 'Unknown error')
           });
         }
         break;
@@ -172,7 +178,7 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         } catch (err) {
           await sendToContentScriptSafe(tab.id, {
             action: 'showError',
-            error: chrome.i18n.getMessage('toast_generateFailed', err.message)
+            error: chrome.i18n.getMessage('toast_generateFailed', err.message || 'Unknown error')
           });
         }
         break;
@@ -188,7 +194,7 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         } catch (err) {
           await sendToContentScriptSafe(tab.id, {
             action: 'showError',
-            error: chrome.i18n.getMessage('toast_generateFailed', err.message)
+            error: chrome.i18n.getMessage('toast_generateFailed', err.message || 'Unknown error')
           });
         }
         break;
@@ -219,7 +225,7 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
           console.error('[QR Helper] scanImage error:', err);
           await sendToContentScriptSafe(tab.id, {
             action: 'showError',
-            error: chrome.i18n.getMessage('toast_scanError', err.message)
+            error: chrome.i18n.getMessage('toast_scanError', err.message || 'Unknown error')
           });
         }
         break;
